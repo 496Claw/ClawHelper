@@ -1681,3 +1681,193 @@ body {
     background: rgba(26, 39, 68, 0.95);
     border: 1px solid rgba(201, 162, 39, 0.4);
 }
+
+/* ============================================
+   管理後台 (Admin Panel)
+============================================ */
+.nav-admin-btn {
+    background: rgba(201, 162, 39, 0.12);
+    border: 1px solid rgba(201, 162, 39, 0.4);
+    color: var(--muted-gold);
+    font-size: 0.82rem;
+    padding: 0.42rem 0.9rem;
+    border-radius: 8px;
+    cursor: pointer;
+    font-family: inherit;
+    transition: all 0.2s ease;
+}
+.nav-admin-btn:hover {
+    background: rgba(201, 162, 39, 0.28);
+}
+
+.admin-modal {
+    background: linear-gradient(135deg, var(--primary-navy) 0%, var(--deep-blue) 100%);
+    border: 1px solid rgba(201, 162, 39, 0.3);
+    border-radius: 20px;
+    padding: 2rem;
+    width: 92%;
+    max-width: 960px;
+    max-height: 88vh;
+    overflow-y: auto;
+    position: relative;
+    animation: modalFadeIn 0.3s ease;
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+}
+
+.admin-modal-header h2 {
+    color: var(--muted-gold);
+    font-size: 1.25rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid rgba(201, 162, 39, 0.2);
+}
+
+/* ── Admin Tabs ── */
+.admin-tabs {
+    display: flex;
+    gap: 0;
+    border-bottom: 1px solid rgba(201, 162, 39, 0.2);
+}
+.admin-tab-btn {
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: var(--light-slate);
+    font-size: 0.88rem;
+    padding: 0.6rem 1.3rem;
+    cursor: pointer;
+    font-family: inherit;
+    transition: color 0.2s, border-color 0.2s;
+    margin-bottom: -1px;
+}
+.admin-tab-btn:hover {
+    color: var(--white);
+}
+.admin-tab-btn.active {
+    color: var(--muted-gold);
+    border-bottom-color: var(--muted-gold);
+}
+
+/* ── Admin Table ── */
+.admin-tab-panel {
+    min-height: 180px;
+    overflow-x: auto;
+}
+.admin-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.83rem;
+}
+.admin-table th {
+    text-align: left;
+    color: var(--light-slate);
+    font-weight: 500;
+    padding: 0.5rem 0.75rem;
+    border-bottom: 1px solid rgba(201, 162, 39, 0.15);
+    white-space: nowrap;
+}
+.admin-table td {
+    padding: 0.65rem 0.75rem;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+    color: var(--white);
+    vertical-align: middle;
+}
+.admin-table tr:hover td {
+    background: rgba(255,255,255,0.03);
+}
+
+/* ── Status Badges ── */
+.admin-status-badge {
+    display: inline-block;
+    padding: 0.18rem 0.6rem;
+    border-radius: 999px;
+    font-size: 0.73rem;
+    font-weight: 600;
+}
+.admin-status-badge.active {
+    background: rgba(22, 101, 52, 0.35);
+    color: #4ade80;
+    border: 1px solid rgba(74, 222, 128, 0.3);
+}
+.admin-status-badge.inactive {
+    background: rgba(127, 29, 29, 0.35);
+    color: #f87171;
+    border: 1px solid rgba(248, 113, 113, 0.3);
+}
+.admin-status-badge.open {
+    background: rgba(30, 64, 175, 0.35);
+    color: #93c5fd;
+    border: 1px solid rgba(147, 197, 253, 0.3);
+}
+.admin-status-badge.closed {
+    background: rgba(75, 85, 99, 0.35);
+    color: #9ca3af;
+    border: 1px solid rgba(156, 163, 175, 0.3);
+}
+
+/* ── Action Buttons ── */
+.admin-action-btn {
+    background: none;
+    border: 1px solid;
+    border-radius: 6px;
+    padding: 0.22rem 0.55rem;
+    font-size: 0.75rem;
+    cursor: pointer;
+    font-family: inherit;
+    transition: background 0.18s;
+    margin-right: 0.3rem;
+}
+.admin-action-btn.toggle-active {
+    color: #f87171;
+    border-color: rgba(248, 113, 113, 0.4);
+}
+.admin-action-btn.toggle-active:hover {
+    background: rgba(127, 29, 29, 0.3);
+}
+.admin-action-btn.toggle-inactive {
+    color: #4ade80;
+    border-color: rgba(74, 222, 128, 0.4);
+}
+.admin-action-btn.toggle-inactive:hover {
+    background: rgba(22, 101, 52, 0.3);
+}
+.admin-action-btn.delete {
+    color: #f87171;
+    border-color: rgba(248, 113, 113, 0.4);
+}
+.admin-action-btn.delete:hover {
+    background: rgba(127, 29, 29, 0.3);
+}
+.admin-action-btn.unflag {
+    color: #4ade80;
+    border-color: rgba(74, 222, 128, 0.4);
+}
+.admin-action-btn.unflag:hover {
+    background: rgba(22, 101, 52, 0.3);
+}
+.admin-action-btn.close-task {
+    color: #fb923c;
+    border-color: rgba(251, 146, 60, 0.4);
+}
+.admin-action-btn.close-task:hover {
+    background: rgba(120, 53, 15, 0.3);
+}
+
+.admin-no-data {
+    text-align: center;
+    padding: 3rem;
+    color: var(--light-slate);
+    font-size: 0.9rem;
+}
+
+/* ── Admin RWD ── */
+@media (max-width: 640px) {
+    .admin-modal {
+        padding: 1.25rem;
+    }
+    .admin-tab-btn {
+        padding: 0.5rem 0.75rem;
+        font-size: 0.8rem;
+    }
+}

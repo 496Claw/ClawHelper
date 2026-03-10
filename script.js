@@ -32,6 +32,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let activeCategory  = 'all';  // 目前篩選的類別
     let currentServiceId = null;  // 目前詳情 Modal 的 service id
     let selectedNps     = null;   // NPS 選擇值
+    let isAdmin         = false;  // 是否為管理員
 
     // ============================================================
     // 模組 B：Auth（Magic Link）
@@ -118,6 +119,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 display_name: session.user.email.split('@')[0]
             }], { onConflict: 'user_id' });
 
+            // 取得 roles，判斷是否為管理員
+            const { data: profile } = await db.from('user_profiles')
+                .select('roles')
+                .eq('user_id', session.user.id)
+                .single();
+            isAdmin = Array.isArray(profile?.roles) && profile.roles.includes('admin');
+            updateNavbarAdminBtn();
+
             // 若 Modal 還開著，顯示成功步驟
             if (authOverlay.style.display !== 'none') {
                 authStepEmail.style.display = 'none';
@@ -126,7 +135,9 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         } else if (event === 'SIGNED_OUT') {
             currentUser = null;
+            isAdmin     = false;
             updateNavbarAuthState(null);
+            updateNavbarAdminBtn();
         }
     });
 
@@ -698,6 +709,221 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
     // ============================================================
+    // 模組 I：管理後台（Admin Panel）
+    // 身份依據：user_profiles.roles 含 'admin'
+    // ============================================================
+
+    function updateNavbarAdminBtn() {
+        const btn = document.getElementById('nav-admin-btn');
+        if (btn) btn.style.display = isAdmin ? 'inline-flex' : 'none';
+    }
+
+    function showAdminPanel() {
+        if (!isAdmin) return;
+        document.getElementById('admin-overlay').style.display = 'flex';
+        switchAdminTab('services');
+    }
+
+    function closeAdminPanel() {
+        document.getElementById('admin-overlay').style.display = 'none';
+    }
+
+    document.getElementById('admin-overlay').addEventListener('click', (e) => {
+        if (e.target === document.getElementById('admin-overlay')) closeAdminPanel();
+    });
+
+    function switchAdminTab(tab) {
+        document.querySelectorAll('.admin-tab-btn').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.tab === tab);
+        });
+        document.querySelectorAll('.admin-tab-panel').forEach(panel => {
+            panel.style.display = panel.dataset.tab === tab ? 'block' : 'none';
+        });
+        if (tab === 'services') loadAdminServices();
+        else if (tab === 'reviews') loadAdminFlaggedReviews();
+        else if (tab === 'tasks') loadAdminTasks();
+    }
+
+    // ── 服務管理 ──
+
+    async function loadAdminServices() {
+        const panel = document.getElementById('admin-services-panel');
+        panel.innerHTML = '<div class="admin-no-data"><div class="loading-spinner"></div></div>';
+
+        const { data, error } = await db.from('services')
+            .select('id, title, category, status, created_at, user_profiles!services_provider_id_fkey (display_name)')
+            .order('created_at', { ascending: false });
+
+        if (error || !data) {
+            panel.innerHTML = `<div class="admin-no-data">載入失敗：${error?.message || ''}</div>`;
+            return;
+        }
+        if (data.length === 0) {
+            panel.innerHTML = '<div class="admin-no-data">尚無服務資料</div>';
+            return;
+        }
+
+        panel.innerHTML = `
+            <table class="admin-table">
+                <thead><tr>
+                    <th>服務名稱</th><th>類別</th><th>服務方</th>
+                    <th>狀態</th><th>上架時間</th><th>操作</th>
+                </tr></thead>
+                <tbody>
+                    ${data.map(s => `
+                        <tr>
+                            <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(s.title)}</td>
+                            <td>${escapeHtml(s.category)}</td>
+                            <td>${escapeHtml(s.user_profiles?.display_name || '—')}</td>
+                            <td><span class="admin-status-badge ${s.status}">${s.status === 'active' ? '上架中' : '已下架'}</span></td>
+                            <td>${formatDate(s.created_at)}</td>
+                            <td>
+                                <button class="admin-action-btn ${s.status === 'active' ? 'toggle-active' : 'toggle-inactive'}"
+                                    onclick="window.adminToggleService('${s.id}', '${s.status}')">
+                                    ${s.status === 'active' ? '下架' : '重新上架'}
+                                </button>
+                                <button class="admin-action-btn delete"
+                                    onclick="window.adminDeleteService('${s.id}')">刪除</button>
+                            </td>
+                        </tr>`).join('')}
+                </tbody>
+            </table>`;
+    }
+
+    async function adminToggleService(id, currentStatus) {
+        const newStatus = currentStatus === 'active' ? 'inactive' : 'active';
+        const { error } = await db.from('services').update({ status: newStatus }).eq('id', id);
+        if (error) { showToast('操作失敗：' + error.message, 'error'); return; }
+        showToast(newStatus === 'active' ? '✅ 服務已重新上架' : '✅ 服務已下架', 'success');
+        loadAdminServices();
+        loadServices();
+    }
+
+    async function adminDeleteService(id) {
+        if (!confirm('確定要刪除此服務嗎？此操作無法復原。')) return;
+        const { error } = await db.from('services').delete().eq('id', id);
+        if (error) { showToast('刪除失敗：' + error.message, 'error'); return; }
+        showToast('✅ 服務已刪除', 'success');
+        loadAdminServices();
+        loadServices();
+    }
+
+    // ── 評價管理（標記異常） ──
+
+    async function loadAdminFlaggedReviews() {
+        const panel = document.getElementById('admin-reviews-panel');
+        panel.innerHTML = '<div class="admin-no-data"><div class="loading-spinner"></div></div>';
+
+        const { data, error } = await db.from('reviews')
+            .select('id, nps_score, comment, created_at, user_profiles!reviews_reviewer_id_fkey (display_name), services (title)')
+            .eq('ai_flagged', true)
+            .order('created_at', { ascending: false });
+
+        if (error || !data) {
+            panel.innerHTML = `<div class="admin-no-data">載入失敗：${error?.message || ''}</div>`;
+            return;
+        }
+        if (data.length === 0) {
+            panel.innerHTML = '<div class="admin-no-data">✅ 目前沒有被標記的評價</div>';
+            return;
+        }
+
+        panel.innerHTML = `
+            <table class="admin-table">
+                <thead><tr>
+                    <th>評價者</th><th>服務</th><th>NPS</th>
+                    <th>留言</th><th>時間</th><th>操作</th>
+                </tr></thead>
+                <tbody>
+                    ${data.map(r => `
+                        <tr>
+                            <td>${escapeHtml(r.user_profiles?.display_name || '匿名')}</td>
+                            <td style="max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(r.services?.title || '—')}</td>
+                            <td>${r.nps_score}</td>
+                            <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+                                ${r.comment ? escapeHtml(r.comment) : '<span style="color:var(--light-slate);">無</span>'}
+                            </td>
+                            <td>${formatDate(r.created_at)}</td>
+                            <td>
+                                <button class="admin-action-btn unflag" onclick="window.adminUnflagReview('${r.id}')">恢復顯示</button>
+                                <button class="admin-action-btn delete" onclick="window.adminDeleteReview('${r.id}')">刪除</button>
+                            </td>
+                        </tr>`).join('')}
+                </tbody>
+            </table>`;
+    }
+
+    async function adminUnflagReview(id) {
+        const { error } = await db.from('reviews').update({ ai_flagged: false }).eq('id', id);
+        if (error) { showToast('操作失敗：' + error.message, 'error'); return; }
+        showToast('✅ 評價已恢復顯示', 'success');
+        loadAdminFlaggedReviews();
+    }
+
+    async function adminDeleteReview(id) {
+        if (!confirm('確定要永久刪除這則評價嗎？')) return;
+        const { error } = await db.from('reviews').delete().eq('id', id);
+        if (error) { showToast('刪除失敗：' + error.message, 'error'); return; }
+        showToast('✅ 評價已刪除', 'success');
+        loadAdminFlaggedReviews();
+    }
+
+    // ── 任務管理 ──
+
+    async function loadAdminTasks() {
+        const panel = document.getElementById('admin-tasks-panel');
+        panel.innerHTML = '<div class="admin-no-data"><div class="loading-spinner"></div></div>';
+
+        const { data, error } = await db.from('task_requests')
+            .select('id, title, category, status, budget, district, created_at')
+            .order('created_at', { ascending: false })
+            .limit(50);
+
+        if (error || !data) {
+            panel.innerHTML = `<div class="admin-no-data">載入失敗：${error?.message || ''}</div>`;
+            return;
+        }
+        if (data.length === 0) {
+            panel.innerHTML = '<div class="admin-no-data">尚無任務資料</div>';
+            return;
+        }
+
+        panel.innerHTML = `
+            <table class="admin-table">
+                <thead><tr>
+                    <th>任務名稱</th><th>類別</th><th>地區</th>
+                    <th>預算</th><th>狀態</th><th>時間</th><th>操作</th>
+                </tr></thead>
+                <tbody>
+                    ${data.map(t => `
+                        <tr>
+                            <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(t.title)}</td>
+                            <td>${escapeHtml(t.category)}</td>
+                            <td>${t.district ? escapeHtml(t.district) : '—'}</td>
+                            <td>${t.budget ? t.budget.toLocaleString() + ' 元' : '面議'}</td>
+                            <td><span class="admin-status-badge ${t.status}">${t.status === 'open' ? '徵求中' : '已關閉'}</span></td>
+                            <td>${formatDate(t.created_at)}</td>
+                            <td>
+                                ${t.status === 'open'
+                                    ? `<button class="admin-action-btn close-task" onclick="window.adminCloseTask('${t.id}')">關閉任務</button>`
+                                    : '<span style="color:var(--light-slate);font-size:0.75rem;">已結束</span>'}
+                            </td>
+                        </tr>`).join('')}
+                </tbody>
+            </table>`;
+    }
+
+    async function adminCloseTask(id) {
+        if (!confirm('確定要關閉這個任務嗎？')) return;
+        const { error } = await db.from('task_requests').update({ status: 'closed' }).eq('id', id);
+        if (error) { showToast('操作失敗：' + error.message, 'error'); return; }
+        showToast('✅ 任務已關閉', 'success');
+        loadAdminTasks();
+        loadOpenTasks();
+    }
+
+
+    // ============================================================
     // 全域暴露（供 HTML onclick 使用）
     // ============================================================
     window.showAuthModal            = showAuthModal;
@@ -708,6 +934,15 @@ document.addEventListener('DOMContentLoaded', () => {
     window.closeServiceDetailModal  = closeServiceDetailModal;
     window.selectNps                = selectNps;
     window.submitReview             = submitReview;
+    // Admin
+    window.showAdminPanel           = showAdminPanel;
+    window.closeAdminPanel          = closeAdminPanel;
+    window.switchAdminTab           = switchAdminTab;
+    window.adminToggleService       = adminToggleService;
+    window.adminDeleteService       = adminDeleteService;
+    window.adminUnflagReview        = adminUnflagReview;
+    window.adminDeleteReview        = adminDeleteReview;
+    window.adminCloseTask           = adminCloseTask;
 
 
     // ============================================================

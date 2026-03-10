@@ -28,6 +28,9 @@
                 <li><a href="#post-task-section" class="nav-link">我要找服務</a></li>
                 <li><a href="#provider-section" class="nav-link">我要接案</a></li>
                 <li>
+                    <button class="nav-admin-btn" id="nav-admin-btn" onclick="window.showAdminPanel()" style="display:none;">⚙️ 管理後台</button>
+                </li>
+                <li>
                     <button class="nav-auth-btn" id="nav-auth-btn" onclick="window.showAuthModal()">登入 / 註冊</button>
                 </li>
             </ul>
@@ -358,6 +361,41 @@
                 <button class="submit-btn" id="submit-review-btn" style="margin-top:1rem;" onclick="window.submitReview()">
                     <span class="btn-icon">⭐</span>送出評價
                 </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ====================================================
+         ADMIN PANEL MODAL（管理後台）
+    ==================================================== -->
+    <div class="auth-overlay" id="admin-overlay" style="display:none;" aria-modal="true" role="dialog">
+        <div class="admin-modal">
+            <button class="auth-modal-close" onclick="window.closeAdminPanel()">✕</button>
+
+            <div class="admin-modal-header">
+                <h2>⚙️ 管理後台</h2>
+            </div>
+
+            <!-- Tab 列 -->
+            <div class="admin-tabs">
+                <button class="admin-tab-btn active" data-tab="services" onclick="window.switchAdminTab('services')">🗂️ 服務管理</button>
+                <button class="admin-tab-btn" data-tab="reviews" onclick="window.switchAdminTab('reviews')">🚩 評價管理</button>
+                <button class="admin-tab-btn" data-tab="tasks" onclick="window.switchAdminTab('tasks')">📋 任務管理</button>
+            </div>
+
+            <!-- 服務管理 Tab -->
+            <div class="admin-tab-panel" data-tab="services" id="admin-services-panel">
+                <div class="admin-no-data"><div class="loading-spinner"></div></div>
+            </div>
+
+            <!-- 評價管理 Tab -->
+            <div class="admin-tab-panel" data-tab="reviews" id="admin-reviews-panel" style="display:none;">
+                <div class="admin-no-data"><div class="loading-spinner"></div></div>
+            </div>
+
+            <!-- 任務管理 Tab -->
+            <div class="admin-tab-panel" data-tab="tasks" id="admin-tasks-panel" style="display:none;">
+                <div class="admin-no-data"><div class="loading-spinner"></div></div>
             </div>
         </div>
     </div>
