@@ -120,13 +120,15 @@ document.addEventListener('DOMContentLoaded', () => {
             }], { onConflict: 'user_id' });
 
             // 取得 roles，判斷是否為管理員
-            const { data: profile } = await db.from('user_profiles')
+            const { data: profile, error: profileErr } = await db.from('user_profiles')
                 .select('roles')
                 .eq('user_id', session.user.id)
                 .single();
-            console.log('🔑 roles raw:', profile?.roles, '| isAdmin:', Array.isArray(profile?.roles) && profile.roles.includes('admin'));
+            console.log('🔑 profile:', profile, '| error:', profileErr);
             isAdmin = Array.isArray(profile?.roles) && profile.roles.includes('admin');
+            console.log('🔑 isAdmin:', isAdmin);
             updateNavbarAdminBtn();
+            console.log('🔑 btn display:', document.getElementById('nav-admin-btn')?.style.display);
 
             // 若 Modal 還開著，顯示成功步驟
             if (authOverlay.style.display !== 'none') {
