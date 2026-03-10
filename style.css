@@ -1218,7 +1218,9 @@ body {
 }
 .sort-wrapper {
     min-width: 140px;
+    max-width: 160px;
     margin-bottom: 0;
+    flex-shrink: 0;
 }
 
 /* ── 服務卡片 Grid ── */
@@ -1678,5 +1680,4 @@ body {
 .toast.info {
     background: rgba(26, 39, 68, 0.95);
     border: 1px solid rgba(201, 162, 39, 0.4);
-}
 }
