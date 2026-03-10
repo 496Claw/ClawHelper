@@ -124,6 +124,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 .select('roles')
                 .eq('user_id', session.user.id)
                 .single();
+            console.log('🔑 roles raw:', profile?.roles, '| isAdmin:', Array.isArray(profile?.roles) && profile.roles.includes('admin'));
             isAdmin = Array.isArray(profile?.roles) && profile.roles.includes('admin');
             updateNavbarAdminBtn();
 
