@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ClawHelper | 在地服務媒合平台</title>
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&display=swap" rel="stylesheet">
+
+    <!-- Supabase JS SDK -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <!-- ====================================================
+         NAVBAR
+    ==================================================== -->
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="nav-logo">🦀 ClawHelper</div>
+            <ul class="nav-links">
+                <li><a href="#browse-section" class="nav-link active">瀏覽服務</a></li>
+                <li><a href="#post-task-section" class="nav-link">我要找服務</a></li>
+                <li><a href="#provider-section" class="nav-link">我要接案</a></li>
+                <li>
+                    <button class="nav-auth-btn" id="nav-auth-btn" onclick="window.showAuthModal()">登入 / 註冊</button>
+                </li>
+            </ul>
+        </div>
+    </nav>
+
+    <!-- ====================================================
+         HERO SECTION
+    ==================================================== -->
+    <section class="hero" id="hero-section">
+        <div class="hero-content">
+            <h1 class="slogan">在地服務，一手搞定</h1>
+            <p class="subtitle">連結社區需求與服務達人的最佳平台<br>即時媒合・透明評價・安心有保障</p>
+
+            <!-- 四個服務類別卡片 -->
+            <div class="category-grid">
+                <div class="category-card" data-category="水電修繕" onclick="window.filterByCategory('水電修繕')">
+                    <span class="category-icon">🔧</span>
+                    <span class="category-name">水電修繕</span>
+                    <span class="category-desc">水管、電路、冷氣、油漆</span>
+                </div>
+                <div class="category-card" data-category="家教與教學" onclick="window.filterByCategory('家教與教學')">
+                    <span class="category-icon">📚</span>
+                    <span class="category-name">家教與教學</span>
+                    <span class="category-desc">各科補習、語言、才藝</span>
+                </div>
+                <div class="category-card" data-category="家事服務" onclick="window.filterByCategory('家事服務')">
+                    <span class="category-icon">🏠</span>
+                    <span class="category-name">家事服務</span>
+                    <span class="category-desc">清潔、煮飯、整理、照護</span>
+                </div>
+                <div class="category-card" data-category="短途運送與小型任務" onclick="window.filterByCategory('短途運送與小型任務')">
+                    <span class="category-icon">🚗</span>
+                    <span class="category-name">短途運送</span>
+                    <span class="category-desc">搬家協助、代購、小型跑腿</span>
+                </div>
+            </div>
+
+            <!-- 雙入口 CTA -->
+            <div class="hero-ctas">
+                <button class="cta-btn cta-primary" onclick="document.getElementById('browse-section').scrollIntoView({behavior:'smooth'})">
+                    🔍 瀏覽服務方
+                </button>
+                <button class="cta-btn cta-secondary" onclick="document.getElementById('post-task-section').scrollIntoView({behavior:'smooth'})">
+                    📋 發布我的需求
+                </button>
+            </div>
+        </div>
+    </section>
+
+    <!-- ====================================================
+         BROWSE SECTION（瀏覽服務）
+    ==================================================== -->
+    <section class="section" id="browse-section">
+        <div class="section-header">
+            <h2 class="section-title">🔍 瀏覽服務</h2>
+            <p class="section-desc">找到最適合你的在地服務達人</p>
+        </div>
+
+        <!-- 篩選列 -->
+        <div class="filter-bar">
+            <div class="category-tabs">
+                <button class="category-tab active" data-filter="all" onclick="window.filterByCategory('all')">全部</button>
+                <button class="category-tab" data-filter="水電修繕" onclick="window.filterByCategory('水電修繕')">🔧 水電修繕</button>
+                <button class="category-tab" data-filter="家教與教學" onclick="window.filterByCategory('家教與教學')">📚 家教與教學</button>
+                <button class="category-tab" data-filter="家事服務" onclick="window.filterByCategory('家事服務')">🏠 家事服務</button>
+                <button class="category-tab" data-filter="短途運送與小型任務" onclick="window.filterByCategory('短途運送與小型任務')">🚗 短途運送</button>
+            </div>
+            <div class="select-wrapper sort-wrapper">
+                <select class="form-select sort-select" id="sort-select" onchange="window.loadServices()">
+                    <option value="avg_nps">評分最高</option>
+                    <option value="created_at">最新上架</option>
+                    <option value="price">價格最低</option>
+                </select>
+                <span class="select-arrow">▾</span>
+            </div>
+        </div>
+
+        <!-- 服務卡片 Grid -->
+        <div class="services-grid" id="services-container">
+            <div class="loading-placeholder">
+                <div class="loading-spinner"></div>
+                <p class="loading-title">載入服務中...</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- ====================================================
+         POST TASK SECTION（我要找服務 / 發單）
+    ==================================================== -->
+    <section class="section" id="post-task-section">
+        <div class="section-header">
+            <h2 class="section-title">📋 發布需求</h2>
+            <p class="section-desc">說出你的需求，讓服務達人主動來聯絡你</p>
+        </div>
+
+        <div class="enterprise-form-wrapper">
+            <form class="enterprise-form" id="post-task-form">
+                <div class="form-group">
+                    <label class="form-label">
+                        <span class="label-icon">📝</span>任務標題
+                    </label>
+                    <input type="text" class="form-input" id="task-title" placeholder="例如：浴室水管漏水需要修繕" required>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">
+                        <span class="label-icon">🏷️</span>服務類別
+                    </label>
+                    <div class="select-wrapper">
+                        <select class="form-select" id="task-category" required>
+                            <option value="" disabled selected>請選擇類別</option>
+                            <option value="水電修繕">🔧 水電修繕</option>
+                            <option value="家教與教學">📚 家教與教學</option>
+                            <option value="家事服務">🏠 家事服務</option>
+                            <option value="短途運送與小型任務">🚗 短途運送與小型任務</option>
+                        </select>
+                        <span class="select-arrow">▾</span>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">
+                        <span class="label-icon">📄</span>需求描述
+                    </label>
+                    <textarea class="form-textarea" id="task-description" rows="5" placeholder="請詳細描述你的需求，越詳細越能快速媒合到合適的服務方..." required></textarea>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group form-half">
+                        <label class="form-label">
+                            <span class="label-icon">💰</span>預算（元）
+                        </label>
+                        <input type="number" class="form-input" id="task-budget" placeholder="面議請留空" min="0">
+                    </div>
+                    <div class="form-group form-half">
+                        <label class="form-label">
+                            <span class="label-icon">📍</span>服務地區
+                        </label>
+                        <input type="text" class="form-input" id="task-district" placeholder="例如：大安區">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">
+                        <span class="label-icon">📅</span>希望完成日期
+                    </label>
+                    <input type="date" class="form-input" id="task-deadline">
+                </div>
+
+                <button type="submit" class="submit-btn">
+                    <span class="btn-icon">🚀</span>
+                    <span id="post-task-label">發布需求</span>
+                </button>
+            </form>
+        </div>
+
+        <!-- 目前公開任務列表 -->
+        <div class="tasks-section-header">
+            <h3 class="tasks-section-title">📌 目前開放中的任務</h3>
+            <p class="tasks-section-desc">服務達人可以點擊任務了解需求後主動聯絡</p>
+        </div>
+        <div class="tasks-list" id="tasks-container">
+            <div class="loading-placeholder">
+                <div class="loading-spinner"></div>
+                <p class="loading-title">載入任務中...</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- ====================================================
+         PROVIDER SECTION（我要接案 / 服務上架）
+    ==================================================== -->
+    <section class="section" id="provider-section">
+        <div class="section-header">
+            <h2 class="section-title">🙋 成為服務達人</h2>
+            <p class="section-desc">上架你的服務，讓有需要的民眾找到你</p>
+        </div>
+
+        <div class="enterprise-form-wrapper">
+            <form class="enterprise-form" id="provider-form">
+                <div class="form-group">
+                    <label class="form-label">
+                        <span class="label-icon">✨</span>服務名稱
+                    </label>
+                    <input type="text" class="form-input" id="service-title" placeholder="例如：專業水電師傅・20年經驗・大台北地區" required>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">
+                        <span class="label-icon">🏷️</span>服務類別
+                    </label>
+                    <div class="select-wrapper">
+                        <select class="form-select" id="service-category" required>
+                            <option value="" disabled selected>請選擇類別</option>
+                            <option value="水電修繕">🔧 水電修繕</option>
+                            <option value="家教與教學">📚 家教與教學</option>
+                            <option value="家事服務">🏠 家事服務</option>
+                            <option value="短途運送與小型任務">🚗 短途運送與小型任務</option>
+                        </select>
+                        <span class="select-arrow">▾</span>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">
+                        <span class="label-icon">📄</span>服務描述
+                    </label>
+                    <textarea class="form-textarea" id="service-description" rows="5" placeholder="詳細說明你能提供的服務、專長、工作經驗等..." required></textarea>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group form-half">
+                        <label class="form-label">
+                            <span class="label-icon">💰</span>收費方式
+                        </label>
+                        <div class="select-wrapper">
+                            <select class="form-select" id="service-pricing-type">
+                                <option value="hourly">時薪計費</option>
+                                <option value="per_task">次計費（固定）</option>
+                                <option value="negotiable">面議</option>
+                            </select>
+                            <span class="select-arrow">▾</span>
+                        </div>
+                    </div>
+                    <div class="form-group form-half">
+                        <label class="form-label">
+                            <span class="label-icon">🔢</span>費用金額（元）
+                        </label>
+                        <input type="number" class="form-input" id="service-price" placeholder="面議請留空" min="0">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">
+                        <span class="label-icon">📍</span>服務地區
+                    </label>
+                    <input type="text" class="form-input" id="service-district" placeholder="例如：大安區、信義區、松山區">
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">
+                        <span class="label-icon">👤</span>你的顯示名稱
+                    </label>
+                    <input type="text" class="form-input" id="provider-display-name" placeholder="讓民眾知道怎麼稱呼你" required>
+                </div>
+
+                <button type="submit" class="submit-btn">
+                    <span class="btn-icon">🦀</span>
+                    <span id="provider-submit-label">上架我的服務</span>
+                </button>
+            </form>
+        </div>
+    </section>
+
+    <!-- ====================================================
+         FOOTER
+    ==================================================== -->
+    <footer class="footer">
+        <p>© 2026 ClawHelper · 496Claw · 在地服務媒合平台</p>
+    </footer>
+
+    <!-- ====================================================
+         AUTH MODAL（Magic Link 登入）
+    ==================================================== -->
+    <div class="auth-overlay" id="auth-overlay" style="display:none;" aria-modal="true" role="dialog">
+        <div class="auth-modal">
+            <button class="auth-modal-close" id="auth-modal-close" aria-label="關閉">✕</button>
+
+            <!-- Step 1: Email 輸入 -->
+            <div id="auth-step-email">
+                <div class="auth-modal-icon">🦀</div>
+                <h2 class="auth-modal-title">登入 / 註冊</h2>
+                <p class="auth-modal-desc">輸入你的 Email，我們將寄送登入連結給你，無需密碼！</p>
+                <div class="auth-input-group">
+                    <input type="email" class="auth-email-input" id="auth-email" placeholder="your@email.com" autocomplete="email">
+                    <button class="auth-send-btn" id="auth-send-btn">
+                        <span id="auth-send-label">寄送登入連結</span>
+                    </button>
+                </div>
+                <p class="auth-privacy-hint">✅ 無需密碼・一鍵登入・安全便利</p>
+            </div>
+
+            <!-- Step 2: 已寄出 -->
+            <div id="auth-step-sent" style="display:none;">
+                <div class="auth-modal-icon" style="animation: bounceIn 0.5s ease;">✉️</div>
+                <h2 class="auth-modal-title">登入連結已寄出！</h2>
+                <p class="auth-modal-desc">我們已將登入連結寄送至：</p>
+                <p class="auth-email-display" id="auth-email-display"></p>
+                <p class="auth-modal-desc" style="margin-top:1rem;font-size:0.85rem;color:var(--light-slate);">
+                    請查看你的信箱，點擊連結後即可完成登入。<br>若未收到，請檢查垃圾信件夾。
+                </p>
+            </div>
+
+            <!-- Step 3: 登入成功 -->
+            <div id="auth-step-saved" style="display:none;">
+                <div class="auth-modal-icon" style="animation: bounceIn 0.5s ease;">🎉</div>
+                <h2 class="auth-modal-title">登入成功！</h2>
+                <p class="auth-modal-desc">歡迎加入 ClawHelper！<br>你現在可以發布需求或上架服務了。</p>
+                <button class="auth-done-btn" id="auth-done-btn">開始使用</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ====================================================
+         SERVICE DETAIL MODAL（服務詳情 + 評價）
+    ==================================================== -->
+    <div class="auth-overlay" id="service-detail-overlay" style="display:none;" aria-modal="true" role="dialog">
+        <div class="auth-modal service-detail-modal">
+            <button class="auth-modal-close" onclick="window.closeServiceDetailModal()">✕</button>
+
+            <div id="service-detail-content">
+                <!-- 動態填入 -->
+            </div>
+
+            <!-- NPS 留評區 -->
+            <div class="review-form-section" id="review-form-section" style="display:none;">
+                <h4 class="review-form-title">✍️ 留下你的評價</h4>
+                <p class="review-form-desc">你推薦這位服務達人的可能性有多高？（0=完全不推薦，10=非常推薦）</p>
+                <div class="nps-picker" id="nps-picker">
+                    <!-- 0–10 數字按鈕，動態生成 -->
+                </div>
+                <div class="nps-labels">
+                    <span>😞 完全不推薦</span>
+                    <span>😊 非常推薦</span>
+                </div>
+                <textarea class="form-textarea" id="review-comment" rows="3" placeholder="說說你的服務體驗...（選填）" style="margin-top:1rem;"></textarea>
+                <button class="submit-btn" id="submit-review-btn" style="margin-top:1rem;" onclick="window.submitReview()">
+                    <span class="btn-icon">⭐</span>送出評價
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast 容器 -->
+    <div class="toast-container" id="toast-container"></div>
+
+    <script src="script.js"></script>
+</body>
+</html>
