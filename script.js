@@ -113,22 +113,8 @@ document.addEventListener('DOMContentLoaded', () => {
             currentUser = session.user;
             updateNavbarAuthState(session.user);
 
-            // 確保 user_profiles 存在（upsert）
-            await db.from('user_profiles').upsert([{
-                user_id: session.user.id,
-                display_name: session.user.email.split('@')[0]
-            }], { onConflict: 'user_id' });
-
-            // 取得 roles，判斷是否為管理員
-            const { data: profile, error: profileErr } = await db.from('user_profiles')
-                .select('roles')
-                .eq('user_id', session.user.id)
-                .single();
-            console.log('🔑 profile:', profile, '| error:', profileErr);
-            isAdmin = Array.isArray(profile?.roles) && profile.roles.includes('admin');
-            console.log('🔑 isAdmin:', isAdmin);
-            updateNavbarAdminBtn();
-            console.log('🔑 btn display:', document.getElementById('nav-admin-btn')?.style.display);
+            // 確保 user_profiles 存在 + 取得 roles（帶 retry，避免 Supabase lock AbortError）
+            await syncUserProfile(session.user.id, session.user.email);
 
             // 若 Modal 還開著，顯示成功步驟
             if (authOverlay.style.display !== 'none') {
@@ -715,6 +701,34 @@ document.addEventListener('DOMContentLoaded', () => {
     // 模組 I：管理後台（Admin Panel）
     // 身份依據：user_profiles.roles 含 'admin'
     // ============================================================
+
+    /** upsert user_profiles + 讀取 roles，遇到 Supabase lock AbortError 自動重試 */
+    async function syncUserProfile(userId, email, attempt = 1) {
+        try {
+            await db.from('user_profiles').upsert([{
+                user_id: userId,
+                display_name: email.split('@')[0]
+            }], { onConflict: 'user_id' });
+
+            const { data: profile, error: profileErr } = await db.from('user_profiles')
+                .select('roles')
+                .eq('user_id', userId)
+                .single();
+
+            if (profileErr) throw profileErr;
+
+            isAdmin = Array.isArray(profile?.roles) && profile.roles.includes('admin');
+            console.log('🔑 isAdmin:', isAdmin, '| roles:', profile?.roles);
+            updateNavbarAdminBtn();
+        } catch (e) {
+            if (e.name === 'AbortError' && attempt <= 3) {
+                console.warn(`🔑 AbortError，${attempt} 秒後重試...`);
+                setTimeout(() => syncUserProfile(userId, email, attempt + 1), attempt * 1000);
+            } else {
+                console.error('🔑 syncUserProfile 失敗:', e);
+            }
+        }
+    }
 
     function updateNavbarAdminBtn() {
         const btn = document.getElementById('nav-admin-btn');
