@@ -742,6 +742,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (tab === 'services') loadAdminServices();
         else if (tab === 'reviews') loadAdminFlaggedReviews();
         else if (tab === 'tasks') loadAdminTasks();
+        else if (tab === 'users') loadAdminUsers();
     }
 
     // ── 服務管理 ──
@@ -922,6 +923,85 @@ document.addEventListener('DOMContentLoaded', () => {
         loadOpenTasks();
     }
 
+    // ── 用戶管理 ──
+
+    async function loadAdminUsers() {
+        const panel = document.getElementById('admin-users-panel');
+        panel.innerHTML = '<div class="admin-no-data"><div class="loading-spinner"></div></div>';
+
+        const { data, error } = await db.from('user_profiles')
+            .select('user_id, display_name, roles, created_at')
+            .order('created_at', { ascending: false });
+
+        if (error || !data) {
+            panel.innerHTML = `<div class="admin-no-data">載入失敗：${error?.message || ''}</div>`;
+            return;
+        }
+        if (data.length === 0) {
+            panel.innerHTML = '<div class="admin-no-data">尚無用戶資料</div>';
+            return;
+        }
+
+        panel.innerHTML = `
+            <table class="admin-table">
+                <thead><tr>
+                    <th>顯示名稱</th><th>角色</th><th>管理員</th><th>加入時間</th><th>操作</th>
+                </tr></thead>
+                <tbody>
+                    ${data.map(u => {
+                        const roles   = Array.isArray(u.roles) ? u.roles : [];
+                        const uIsAdmin = roles.includes('admin');
+                        const isSelf  = u.user_id === currentUser?.id;
+                        const roleStr = roles.length ? roles.join(', ') : '—';
+                        return `
+                        <tr>
+                            <td>${escapeHtml(u.display_name || '—')}</td>
+                            <td style="color:var(--light-slate);font-size:0.8rem;">${escapeHtml(roleStr)}</td>
+                            <td>${uIsAdmin
+                                ? '<span class="admin-status-badge active">是</span>'
+                                : '<span class="admin-status-badge inactive">否</span>'}</td>
+                            <td>${formatDate(u.created_at)}</td>
+                            <td>
+                                ${isSelf
+                                    ? '<span style="color:var(--light-slate);font-size:0.75rem;">（自己）</span>'
+                                    : `<button class="admin-action-btn ${uIsAdmin ? 'toggle-active' : 'toggle-inactive'}"
+                                        onclick="window.adminToggleAdminRole('${u.user_id}', ${uIsAdmin})">
+                                        ${uIsAdmin ? '撤銷管理員' : '設為管理員'}
+                                    </button>`}
+                            </td>
+                        </tr>`;
+                    }).join('')}
+                </tbody>
+            </table>`;
+    }
+
+    async function adminToggleAdminRole(userId, currentlyAdmin) {
+        const action = currentlyAdmin ? '撤銷' : '設為';
+        if (!confirm(`確定要${action}此用戶的管理員身份嗎？`)) return;
+
+        // 先取得目前 roles
+        const { data: profile, error: fetchErr } = await db.from('user_profiles')
+            .select('roles')
+            .eq('user_id', userId)
+            .single();
+        if (fetchErr || !profile) { showToast('操作失敗', 'error'); return; }
+
+        let roles = Array.isArray(profile.roles) ? [...profile.roles] : [];
+        if (currentlyAdmin) {
+            roles = roles.filter(r => r !== 'admin');
+        } else {
+            if (!roles.includes('admin')) roles.push('admin');
+        }
+
+        const { error } = await db.from('user_profiles')
+            .update({ roles })
+            .eq('user_id', userId);
+
+        if (error) { showToast('操作失敗：' + error.message, 'error'); return; }
+        showToast(currentlyAdmin ? '✅ 已撤銷管理員身份' : '✅ 已設為管理員', 'success');
+        loadAdminUsers();
+    }
+
 
     // ============================================================
     // 全域暴露（供 HTML onclick 使用）
@@ -943,6 +1023,7 @@ document.addEventListener('DOMContentLoaded', () => {
     window.adminUnflagReview        = adminUnflagReview;
     window.adminDeleteReview        = adminDeleteReview;
     window.adminCloseTask           = adminCloseTask;
+    window.adminToggleAdminRole     = adminToggleAdminRole;
 
 
     // ============================================================

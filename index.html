@@ -381,6 +381,7 @@
                 <button class="admin-tab-btn active" data-tab="services" onclick="window.switchAdminTab('services')">🗂️ 服務管理</button>
                 <button class="admin-tab-btn" data-tab="reviews" onclick="window.switchAdminTab('reviews')">🚩 評價管理</button>
                 <button class="admin-tab-btn" data-tab="tasks" onclick="window.switchAdminTab('tasks')">📋 任務管理</button>
+                <button class="admin-tab-btn" data-tab="users" onclick="window.switchAdminTab('users')">👥 用戶管理</button>
             </div>
 
             <!-- 服務管理 Tab -->
@@ -395,6 +396,11 @@
 
             <!-- 任務管理 Tab -->
             <div class="admin-tab-panel" data-tab="tasks" id="admin-tasks-panel" style="display:none;">
+                <div class="admin-no-data"><div class="loading-spinner"></div></div>
+            </div>
+
+            <!-- 用戶管理 Tab -->
+            <div class="admin-tab-panel" data-tab="users" id="admin-users-panel" style="display:none;">
                 <div class="admin-no-data"><div class="loading-spinner"></div></div>
             </div>
         </div>
