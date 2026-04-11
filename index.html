@@ -27,6 +27,7 @@
                 <li><a href="#browse-section" class="nav-link active">瀏覽服務</a></li>
                 <li><a href="#post-task-section" class="nav-link">我要找服務</a></li>
                 <li><a href="#provider-section" class="nav-link">我要接案</a></li>
+                <li><a href="#vault-section" class="nav-link">🔒 我的 Vault</a></li>
                 <li>
                     <button class="nav-auth-btn" id="nav-auth-btn" onclick="window.showAuthModal()">登入 / 註冊</button>
                 </li>
@@ -280,6 +281,84 @@
                     <span id="provider-submit-label">上架我的服務</span>
                 </button>
             </form>
+        </div>
+    </section>
+
+    <!-- ====================================================
+         VAULT SECTION（個人 Vault 待辦）
+         私密待辦事項：僅登入使用者本人可見（RLS 強制）
+    ==================================================== -->
+    <section class="section vault-section" id="vault-section">
+        <div class="section-header">
+            <h2 class="section-title">🔒 我的 Vault</h2>
+            <p class="section-desc">私密的個人待辦清單，只有你看得見。<br>記下你想跟進的服務、聯絡的達人、要安排的家事任務。</p>
+        </div>
+
+        <!-- 未登入提示 -->
+        <div class="vault-locked" id="vault-locked">
+            <div class="vault-locked-icon">🔐</div>
+            <h3 class="vault-locked-title">Vault 已上鎖</h3>
+            <p class="vault-locked-desc">登入後即可使用你的個人待辦清單<br>所有資料皆以 Row Level Security 保護</p>
+            <button class="cta-btn cta-primary" onclick="window.showAuthModal(window.loadVaultTodos)">
+                🦀 登入解鎖 Vault
+            </button>
+        </div>
+
+        <!-- Vault 主介面（登入後才顯示） -->
+        <div class="vault-main" id="vault-main" style="display:none;">
+
+            <!-- 新增表單 -->
+            <div class="vault-form-card">
+                <form class="vault-form" id="vault-form">
+                    <div class="vault-form-row vault-form-row-main">
+                        <input type="text" class="form-input vault-title-input"
+                               id="vault-title" maxlength="200"
+                               placeholder="✏️ 新增待辦事項…例如：聯絡王師傅確認到府時間" required>
+                        <button type="submit" class="submit-btn vault-add-btn">
+                            <span class="btn-icon">＋</span>
+                            <span id="vault-submit-label">加入 Vault</span>
+                        </button>
+                    </div>
+                    <div class="vault-form-row vault-form-row-extra">
+                        <div class="select-wrapper vault-priority-wrapper">
+                            <select class="form-select" id="vault-priority">
+                                <option value="low">🟢 低優先</option>
+                                <option value="normal" selected>🟡 一般</option>
+                                <option value="high">🔴 高優先</option>
+                            </select>
+                            <span class="select-arrow">▾</span>
+                        </div>
+                        <input type="date" class="form-input vault-due-input" id="vault-due">
+                        <input type="text" class="form-input vault-notes-input"
+                               id="vault-notes" placeholder="備註（選填）" maxlength="500">
+                    </div>
+                </form>
+            </div>
+
+            <!-- 統計列 + 篩選 -->
+            <div class="vault-toolbar">
+                <div class="vault-stats" id="vault-stats">
+                    <span class="vault-stat-item">📋 總計 <strong id="vault-stat-total">0</strong></span>
+                    <span class="vault-stat-item">⏳ 待辦 <strong id="vault-stat-open">0</strong></span>
+                    <span class="vault-stat-item">✅ 完成 <strong id="vault-stat-done">0</strong></span>
+                </div>
+                <div class="vault-filter-tabs">
+                    <button class="vault-filter-tab active" data-filter="all"
+                            onclick="window.setVaultFilter('all')">全部</button>
+                    <button class="vault-filter-tab" data-filter="open"
+                            onclick="window.setVaultFilter('open')">待辦</button>
+                    <button class="vault-filter-tab" data-filter="done"
+                            onclick="window.setVaultFilter('done')">已完成</button>
+                </div>
+            </div>
+
+            <!-- 待辦清單 -->
+            <div class="vault-list" id="vault-list">
+                <div class="loading-placeholder">
+                    <div class="loading-spinner"></div>
+                    <p class="loading-title">載入 Vault 中...</p>
+                </div>
+            </div>
         </div>
     </section>
 

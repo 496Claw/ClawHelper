@@ -12,6 +12,7 @@
  *   F. 評價系統（NPS Reviews）
  *   G. Navbar + 平滑滾動 + ScrollSpy
  *   H. 工具函式
+ *   I. Vault 個人待辦（私密、僅本人可見）
  * ============================================================
  */
 
@@ -124,9 +125,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 authStepSent.style.display  = 'none';
                 authStepSaved.style.display = 'block';
             }
+
+            // 解鎖並載入 Vault
+            unlockVault();
+            loadVaultTodos();
         } else if (event === 'SIGNED_OUT') {
             currentUser = null;
             updateNavbarAuthState(null);
+            lockVault();
         }
     });
 
@@ -627,7 +633,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     /** ScrollSpy：監聽各 section 進入視口 */
-    const sections = ['browse-section', 'post-task-section', 'provider-section'];
+    const sections = ['browse-section', 'post-task-section', 'provider-section', 'vault-section'];
     const observer = new IntersectionObserver((entries) => {
         entries.forEach(entry => {
             if (entry.isIntersecting) {
@@ -698,6 +704,246 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
     // ============================================================
+    // 模組 I：Vault 個人待辦
+    //
+    // 目標：登入使用者擁有完全私密的待辦清單。
+    //   - 寫入時 user_id 必為自己（DB RLS 強制）
+    //   - 讀取只回傳本人的資料（DB RLS 強制）
+    //   - 未登入時顯示鎖定畫面，登入後解鎖並載入
+    // ============================================================
+
+    let vaultFilter = 'all';   // 'all' | 'open' | 'done'
+    let vaultCache  = [];      // 最近一次載入的待辦資料
+
+    /** 顯示登入後的 Vault 主介面 */
+    function unlockVault() {
+        const locked = document.getElementById('vault-locked');
+        const main   = document.getElementById('vault-main');
+        if (locked) locked.style.display = 'none';
+        if (main)   main.style.display   = 'block';
+    }
+
+    /** 顯示未登入的鎖定畫面 */
+    function lockVault() {
+        const locked = document.getElementById('vault-locked');
+        const main   = document.getElementById('vault-main');
+        if (locked) locked.style.display = 'flex';
+        if (main)   main.style.display   = 'none';
+        vaultCache = [];
+    }
+
+    /** 載入並渲染當前使用者的 Vault 待辦 */
+    async function loadVaultTodos() {
+        if (!currentUser) {
+            lockVault();
+            return;
+        }
+        unlockVault();
+
+        const list = document.getElementById('vault-list');
+        if (!list) return;
+
+        list.innerHTML = `
+            <div class="loading-placeholder">
+                <div class="loading-spinner"></div>
+                <p class="loading-title">載入 Vault 中...</p>
+            </div>`;
+
+        // RLS 會自動把結果限制在本人，但這裡仍主動加上 .eq 以使索引命中
+        const { data, error } = await db.from('user_todos')
+            .select('*')
+            .eq('user_id', currentUser.id)
+            .order('is_done', { ascending: true })
+            .order('created_at', { ascending: false });
+
+        if (error) {
+            console.error('載入 Vault 失敗:', error);
+            list.innerHTML = `<div class="no-data-placeholder"><span class="no-data-icon">😢</span><p>載入失敗：${escapeHtml(error.message)}</p></div>`;
+            return;
+        }
+
+        vaultCache = data || [];
+        renderVaultList();
+    }
+
+    /** 套用篩選並渲染列表 + 統計 */
+    function renderVaultList() {
+        const list = document.getElementById('vault-list');
+        if (!list) return;
+
+        // 統計（以全部資料計算，與篩選無關）
+        const total = vaultCache.length;
+        const done  = vaultCache.filter(t => t.is_done).length;
+        const open  = total - done;
+        document.getElementById('vault-stat-total').textContent = total;
+        document.getElementById('vault-stat-open').textContent  = open;
+        document.getElementById('vault-stat-done').textContent  = done;
+
+        // 篩選
+        let items = vaultCache;
+        if (vaultFilter === 'open') items = items.filter(t => !t.is_done);
+        if (vaultFilter === 'done') items = items.filter(t =>  t.is_done);
+
+        if (items.length === 0) {
+            const emptyMsg = vaultFilter === 'done'
+                ? '尚未完成任何待辦'
+                : vaultFilter === 'open'
+                    ? '🎉 沒有待辦了，做得好！'
+                    : '你的 Vault 是空的，新增第一筆待辦吧！';
+            list.innerHTML = `
+                <div class="no-data-placeholder">
+                    <span class="no-data-icon">🗒️</span>
+                    <p>${emptyMsg}</p>
+                </div>`;
+            return;
+        }
+
+        list.innerHTML = items.map(renderVaultItem).join('');
+    }
+
+    /** 渲染單筆 Vault 項目 */
+    function renderVaultItem(t) {
+        const priorityClass = `priority-${t.priority}`;
+        const priorityIcon  = t.priority === 'high'
+            ? '🔴'
+            : t.priority === 'low'
+                ? '🟢'
+                : '🟡';
+        const dueStr     = t.due_date ? `📅 ${t.due_date}` : '';
+        const overdue    = t.due_date && !t.is_done && new Date(t.due_date) < new Date(new Date().toDateString());
+        const createdStr = formatDate(t.created_at);
+
+        return `
+            <div class="vault-item ${t.is_done ? 'done' : ''} ${priorityClass}" data-id="${t.id}">
+                <button class="vault-check" aria-label="切換完成"
+                        onclick="window.toggleVaultTodo('${t.id}', ${!t.is_done})">
+                    <span class="vault-check-box">${t.is_done ? '✓' : ''}</span>
+                </button>
+                <div class="vault-item-body">
+                    <div class="vault-item-title">${escapeHtml(t.title)}</div>
+                    ${t.notes ? `<div class="vault-item-notes">${escapeHtml(t.notes)}</div>` : ''}
+                    <div class="vault-item-meta">
+                        <span class="vault-priority-badge ${priorityClass}">${priorityIcon} ${labelForPriority(t.priority)}</span>
+                        ${dueStr ? `<span class="vault-due-badge ${overdue ? 'overdue' : ''}">${dueStr}${overdue ? ' · 已逾期' : ''}</span>` : ''}
+                        <span class="vault-created">建立於 ${createdStr}</span>
+                    </div>
+                </div>
+                <button class="vault-delete" aria-label="刪除"
+                        onclick="window.deleteVaultTodo('${t.id}')">🗑</button>
+            </div>`;
+    }
+
+    function labelForPriority(p) {
+        if (p === 'high') return '高優先';
+        if (p === 'low')  return '低優先';
+        return '一般';
+    }
+
+    /** 設定篩選 */
+    function setVaultFilter(filter) {
+        vaultFilter = filter;
+        document.querySelectorAll('.vault-filter-tab').forEach(tab => {
+            tab.classList.toggle('active', tab.dataset.filter === filter);
+        });
+        renderVaultList();
+    }
+
+    /** 新增待辦 */
+    const vaultForm = document.getElementById('vault-form');
+    if (vaultForm) {
+        vaultForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            if (!currentUser) {
+                showToast('請先登入才能使用 Vault 🔐', 'info');
+                showAuthModal(loadVaultTodos);
+                return;
+            }
+
+            const title    = document.getElementById('vault-title').value.trim();
+            const notes    = document.getElementById('vault-notes').value.trim();
+            const priority = document.getElementById('vault-priority').value;
+            const due      = document.getElementById('vault-due').value;
+
+            if (!title) {
+                showToast('請輸入待辦標題', 'error');
+                return;
+            }
+
+            const label = document.getElementById('vault-submit-label');
+            label.textContent = '加入中...';
+
+            const { error } = await db.from('user_todos').insert([{
+                user_id:  currentUser.id,
+                title,
+                notes:    notes || null,
+                priority,
+                due_date: due  || null
+            }]);
+
+            label.textContent = '加入 Vault';
+
+            if (error) {
+                showToast('加入失敗：' + error.message, 'error');
+                return;
+            }
+
+            showToast('✅ 已加入 Vault', 'success');
+            vaultForm.reset();
+            // reset 會清掉 select 預設，這裡補回
+            document.getElementById('vault-priority').value = 'normal';
+            loadVaultTodos();
+        });
+    }
+
+    /** 切換完成狀態 */
+    async function toggleVaultTodo(id, markDone) {
+        if (!currentUser) return;
+
+        // 樂觀更新
+        const item = vaultCache.find(t => t.id === id);
+        if (item) {
+            item.is_done      = markDone;
+            item.completed_at = markDone ? new Date().toISOString() : null;
+            renderVaultList();
+        }
+
+        const { error } = await db.from('user_todos')
+            .update({
+                is_done:      markDone,
+                completed_at: markDone ? new Date().toISOString() : null
+            })
+            .eq('id', id)
+            .eq('user_id', currentUser.id);
+
+        if (error) {
+            showToast('更新失敗：' + error.message, 'error');
+            loadVaultTodos();   // 失敗時重新同步
+        }
+    }
+
+    /** 刪除待辦 */
+    async function deleteVaultTodo(id) {
+        if (!currentUser) return;
+        if (!confirm('確定要從 Vault 移除這筆待辦？')) return;
+
+        const { error } = await db.from('user_todos')
+            .delete()
+            .eq('id', id)
+            .eq('user_id', currentUser.id);
+
+        if (error) {
+            showToast('刪除失敗：' + error.message, 'error');
+            return;
+        }
+
+        showToast('🗑 已從 Vault 移除', 'info');
+        vaultCache = vaultCache.filter(t => t.id !== id);
+        renderVaultList();
+    }
+
+
+    // ============================================================
     // 全域暴露（供 HTML onclick 使用）
     // ============================================================
     window.showAuthModal            = showAuthModal;
@@ -708,6 +954,10 @@ document.addEventListener('DOMContentLoaded', () => {
     window.closeServiceDetailModal  = closeServiceDetailModal;
     window.selectNps                = selectNps;
     window.submitReview             = submitReview;
+    window.loadVaultTodos           = loadVaultTodos;
+    window.setVaultFilter           = setVaultFilter;
+    window.toggleVaultTodo          = toggleVaultTodo;
+    window.deleteVaultTodo          = deleteVaultTodo;
 
 
     // ============================================================
